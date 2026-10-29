@@ -1,0 +1,25 @@
+name: home-apk
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - name: Build the TV home (option A, built-in copy)
+        run: |
+          cp config.example.json config.json
+          chmod +x tv-home/android/gradlew
+          tv-home/android/gradlew -p tv-home/android --no-daemon assembleRelease -PconfigJson=$PWD/config.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: couch-tv-home-apk
+          path: tv-home/android/app/build/outputs/apk/release/app-release.apk
