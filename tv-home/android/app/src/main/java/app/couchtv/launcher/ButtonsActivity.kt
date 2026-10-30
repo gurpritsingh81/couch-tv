@@ -20,6 +20,8 @@ import android.widget.Toast
 class ButtonsActivity : Activity() {
 
     private lateinit var list: LinearLayout
+    private lateinit var cleanRow: View
+    private val ui = android.os.Handler(android.os.Looper.getMainLooper())
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
@@ -67,7 +69,12 @@ class ButtonsActivity : Activity() {
 
     private fun render() {
         list.removeAllViews()
-        list.addView(row("Button remap", null).apply { textSize = 28f })
+        list.addView(row("TV tools", null).apply { textSize = 28f })
+        val mem = Cleaner.mem(this)
+        list.addView(note("Memory: ${mem.freeMb} MB free of ${mem.totalMb} MB"))
+        cleanRow = row("Close all apps and free memory") { clean() }
+        list.addView(cleanRow)
+        list.addView(row("Buttons", null).apply { textSize = 22f })
         val on = serviceOn()
         list.addView(note(if (on) "Everywhere: ON. Changes work inside every app."
             else "Everywhere: OFF. Changes only work after you switch it on once from a computer or phone (command at the bottom)."))
@@ -81,7 +88,18 @@ class ButtonsActivity : Activity() {
                 "adb shell settings put secure enabled_accessibility_services $packageName/$packageName.ButtonService\n" +
                 "adb shell settings put secure accessibility_enabled 1"))
         }
-        list.getChildAt(list.childCount - (if (on) 1 else 2)).requestFocus()
+        cleanRow.requestFocus()
+    }
+
+    private fun clean() {
+        val before = Cleaner.mem(this).freeMb
+        val n = Cleaner.closeAll(this)
+        Toast.makeText(this, "Closing $n apps...", Toast.LENGTH_SHORT).show()
+        ui.postDelayed({
+            val after = Cleaner.mem(this).freeMb
+            Toast.makeText(this, "Memory free: $before MB to $after MB", Toast.LENGTH_LONG).show()
+            render()
+        }, 1500)
     }
 
     private fun editOne(m: Buttons.Map) {
@@ -148,12 +166,13 @@ class ButtonsActivity : Activity() {
     private fun chooseAction(scan: Int, key: Int, name: String) {
         AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
             .setTitle("$name should")
-            .setItems(arrayOf("Open an app", "Go to Home", "Go Back", "Do nothing")) { _, which ->
+            .setItems(arrayOf("Open an app", "Go to Home", "Go Back", "Close all apps (free memory)", "Do nothing")) { _, which ->
                 when (which) {
                     0 -> chooseApp(scan, key, name)
                     1 -> save(Buttons.Map(scan, key, name, "home", "", "Go to Home"))
                     2 -> save(Buttons.Map(scan, key, name, "back", "", "Go Back"))
-                    3 -> save(Buttons.Map(scan, key, name, "none", "", "Do nothing"))
+                    3 -> save(Buttons.Map(scan, key, name, "clean", "", "Close all apps"))
+                    4 -> save(Buttons.Map(scan, key, name, "none", "", "Do nothing"))
                 }
             }.show()
     }

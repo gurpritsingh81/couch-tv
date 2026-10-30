@@ -593,7 +593,7 @@ class MainActivity : Activity() {
         appCache ?: run {
             val q = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
             packageManager.queryIntentActivities(q, 0)
-                .filter { it.activityInfo.packageName != packageName }
+                .filter { it.activityInfo.packageName != packageName || it.activityInfo.name.endsWith("ButtonsActivity") }
                 .distinctBy { it.activityInfo.packageName }
                 .map { it to it.loadLabel(packageManager).toString() }
                 .sortedBy { it.second.lowercase() }
@@ -715,6 +715,8 @@ class MainActivity : Activity() {
     }
 
     private fun launchPackage(pkg: String): Boolean {
+        // this app's own tile is Button remap (the Home activity is hidden from the list)
+        if (pkg == packageName) return start(Intent(this, ButtonsActivity::class.java))
         val i = packageManager.getLeanbackLaunchIntentForPackage(pkg)
             ?: packageManager.getLaunchIntentForPackage(pkg)
             ?: return false

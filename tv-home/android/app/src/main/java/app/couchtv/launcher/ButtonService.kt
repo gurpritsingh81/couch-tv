@@ -33,6 +33,19 @@ class ButtonService : AccessibilityService() {
         when (m.type) {
             "home" -> performGlobalAction(GLOBAL_ACTION_HOME)
             "back" -> performGlobalAction(GLOBAL_ACTION_BACK)
+            "clean" -> {
+                // go Home first so the app you were in is in the background too, then close everything
+                performGlobalAction(GLOBAL_ACTION_HOME)
+                val h = android.os.Handler(android.os.Looper.getMainLooper())
+                val before = Cleaner.mem(this).freeMb
+                h.postDelayed({
+                    Cleaner.closeAll(this)
+                    h.postDelayed({
+                        android.widget.Toast.makeText(this,
+                            "Memory free: $before MB to ${Cleaner.mem(this).freeMb} MB", android.widget.Toast.LENGTH_LONG).show()
+                    }, 1500)
+                }, 700)
+            }
             "app" -> {
                 val i = packageManager.getLeanbackLaunchIntentForPackage(m.arg)
                     ?: packageManager.getLaunchIntentForPackage(m.arg)
