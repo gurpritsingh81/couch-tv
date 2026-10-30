@@ -66,6 +66,8 @@
         <activity
             android:name=".ButtonsActivity"
             android:label="TV tools"
+            android:icon="@drawable/tools_icon"
+            android:banner="@drawable/tools_banner"
             android:exported="true"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
             <intent-filter>
