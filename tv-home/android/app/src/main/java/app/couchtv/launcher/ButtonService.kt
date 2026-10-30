@@ -15,7 +15,14 @@ class ButtonService : AccessibilityService() {
     override fun onInterrupt() {}
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
-        if (Buttons.learning(this)) return false
+        if (Buttons.learning(this)) {
+            // Setup is waiting for a press. Catch it here, before Sony's own handler can, and hand it over.
+            if (event.keyCode in Buttons.blocked) return false
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                Buttons.prefs(this).edit().putString("learned", "${event.scanCode},${event.keyCode},${System.nanoTime()}").apply()
+            }
+            return true
+        }
         val m = Buttons.find(Buttons.load(this), event) ?: return false
         // act once per press (not on key repeat), and swallow the release too
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) act(m)

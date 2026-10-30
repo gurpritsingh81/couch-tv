@@ -52,6 +52,11 @@ object Buttons {
     /** While the setup screen is waiting for a button press, the service must let the press through. */
     fun learning(c: Context) = System.currentTimeMillis() - prefs(c).getLong("learnAt", 0) < 60000
 
+    /** Keys the TV needs to be usable: never remapped. */
+    val blocked = setOf(KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT,
+        KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_BACK,
+        KeyEvent.KEYCODE_POWER, KeyEvent.KEYCODE_HOME)
+
     fun nameOf(keyCode: Int, scan: Int): String =
         KeyEvent.keyCodeToString(keyCode).removePrefix("KEYCODE_").replace('_', ' ').lowercase()
             .replaceFirstChar { it.uppercase() } + if (scan != 0) " (code $scan)" else ""

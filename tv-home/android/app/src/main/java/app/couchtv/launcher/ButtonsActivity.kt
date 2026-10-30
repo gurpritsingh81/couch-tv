@@ -95,24 +95,47 @@ class ButtonsActivity : Activity() {
             }.show()
     }
 
-    private val blocked = setOf(KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT,
-        KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_BACK,
-        KeyEvent.KEYCODE_POWER, KeyEvent.KEYCODE_HOME)
+    private val blocked get() = Buttons.blocked
+    private var learnDialog: AlertDialog? = null
+    private var learnWatch: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
+
+    private fun stopLearning() {
+        val p = Buttons.prefs(this)
+        p.edit().putLong("learnAt", 0).apply()
+        learnWatch?.let { p.unregisterOnSharedPreferenceChangeListener(it) }
+        learnWatch = null
+    }
 
     private fun learn() {
-        Buttons.prefs(this).edit().putLong("learnAt", System.currentTimeMillis()).apply()
+        val p = Buttons.prefs(this)
+        p.edit().putLong("learnAt", System.currentTimeMillis()).apply()
+        // With the accessibility service on, it reports the press (Sony's own keys never reach the dialog).
+        learnWatch = android.content.SharedPreferences.OnSharedPreferenceChangeListener { sp, k ->
+            if (k == "learned") {
+                val parts = (sp.getString("learned", "") ?: "").split(",")
+                val scan = parts.getOrNull(0)?.toIntOrNull() ?: 0
+                val key = parts.getOrNull(1)?.toIntOrNull() ?: return@OnSharedPreferenceChangeListener
+                runOnUiThread {
+                    stopLearning()
+                    learnDialog?.dismiss()
+                    chooseAction(scan, key, Buttons.nameOf(key, scan))
+                }
+            }
+        }
+        p.registerOnSharedPreferenceChangeListener(learnWatch)
         val d = AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
             .setTitle("Press the remote button")
             .setMessage("Press the button you want to change. Back cancels.")
-            .setOnCancelListener { Buttons.prefs(this).edit().putLong("learnAt", 0).apply() }
+            .setOnCancelListener { stopLearning() }
             .create()
+        learnDialog = d
         d.setOnKeyListener { dlg, keyCode, ev ->
             if (keyCode == KeyEvent.KEYCODE_BACK) return@setOnKeyListener false
             if (ev.action == KeyEvent.ACTION_DOWN && ev.repeatCount == 0) {
                 if (keyCode in blocked) {
                     Toast.makeText(this, "That button is needed to use the TV. Pick another one.", Toast.LENGTH_LONG).show()
                 } else {
-                    Buttons.prefs(this).edit().putLong("learnAt", 0).apply()
+                    stopLearning()
                     dlg.dismiss()
                     chooseAction(ev.scanCode, keyCode, Buttons.nameOf(keyCode, ev.scanCode))
                 }
