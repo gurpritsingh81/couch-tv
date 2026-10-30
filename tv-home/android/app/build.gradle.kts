@@ -22,6 +22,17 @@ android {
         val urls = (project.findProperty("bridgeUrls") as String? ?: "").split(",").map { it.trim() }.filter { it.isNotEmpty() }
         buildConfigField("String[]", "BRIDGES", "{" + urls.joinToString(", ") { "\"" + it + "\"" } + "}")
     }
+    // One fixed key for every build, so a new build installs over the old one and keeps its settings.
+    // A personal key (password "android"): it only proves the app came from this fork. Do not publish with it.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("couch-debug.p12")
+            storeType = "pkcs12"
+            storePassword = "android"
+            keyAlias = "couchtv"
+            keyPassword = "android"
+        }
+    }
     buildFeatures { buildConfig = true }
     buildTypes {
         release {

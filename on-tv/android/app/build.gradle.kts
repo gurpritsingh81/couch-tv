@@ -14,6 +14,17 @@ android {
         versionName = "0.2"
     }
     buildFeatures { buildConfig = true }
+    // One fixed key for every build, so a new build installs over the old one and keeps its settings.
+    // A personal key (password "android"): it only proves the app came from this fork. Do not publish with it.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("couch-debug.p12")
+            storeType = "pkcs12"
+            storePassword = "android"
+            keyAlias = "couchtv"
+            keyPassword = "android"
+        }
+    }
     buildTypes {
         release {
             // Not minified: libadb, Conscrypt and BouncyCastle use reflection, and the size saving is small.
