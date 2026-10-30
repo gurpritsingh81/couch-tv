@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="button_service_desc">Lets Couch TV change what your remote\'s buttons do. It only looks at remote button presses and does not read the screen.</string>
+</resources>
