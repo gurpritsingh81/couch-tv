@@ -69,7 +69,7 @@
   // A maker's own clutter (help apps, file browsers) is listed per house in config.json,
   // home.hide_packages, and added to this list in readConfig().
   var HIDDEN = [
-    "com.google.android.apps.tv.launcherx", "com.google.android.tvlauncher", "app.couchtv.launcher",
+    "com.google.android.apps.tv.launcherx", "com.google.android.tvlauncher",
     "com.limelight", "com.google.android.play.games", "com.google.android.videos"
   ];
   var GRID_COLS = 12, GRID_MAX = 24;
