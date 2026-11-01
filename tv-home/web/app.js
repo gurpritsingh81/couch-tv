@@ -27,7 +27,8 @@
   // read in readConfig() once the page starts (mock.js fills them in for previews). See docs/CONFIG.md.
   var CFG = {}, HOME = {}, TVCFG = {}, QUICK = [];
   var WXCFG = { lat: -33.8688, lon: 151.2093, place: "Sydney", timezone: "Australia/Sydney" };
-  var QUICK_ALL = ["sleep", "picture", "look", "input"];
+  var CTL = ["wifi", "bt", "ads", "clean"];   // quick controls that open a panel (the launcher answers them)
+  var QUICK_ALL = ["sleep", "picture", "look", "input"].concat(CTL);
   // The look: ?theme= for a preview, then Home settings (or the Look button) on this TV, then home.look.
   var THEME = "night", NIGHT = true, CLOCK24 = false;
   // Home settings made on this TV with the gear tile (see "home settings" below). They win over
@@ -86,6 +87,10 @@
     more: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg>',
     gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
     look: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="3"/><path d="M2.5 16l5.5-5.5 4.5 4.5 3-3 6 6"/><circle cx="16.5" cy="8.8" r="1.6"/></svg>',
+    wifi: '<svg viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.8 16a5 5 0 0 1 6.4 0"/><circle cx="12" cy="19.2" r="1.1" class="fill"/></svg>',
+    bt: '<svg viewBox="0 0 24 24"><path d="M7 7.5l10 9-5 4.5V3l5 4.5-10 9"/></svg>',
+    ads: '<svg viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.5c0 4.5-3 8-7.5 9.5-4.5-1.5-7.5-5-7.5-9.5V6z"/><path d="M8.8 12l2.4 2.4 4-4.4"/></svg>',
+    clean: '<svg viewBox="0 0 24 24"><rect x="5" y="7" width="14" height="10" rx="2"/><path d="M8 7V4.5M12 7V4.5M16 7V4.5M8 19.5V17M12 19.5V17M16 19.5V17"/></svg>',
     input: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2.5"/><path d="M8 21h8M12 7.5v6M9.5 11l2.5 2.5 2.5-2.5"/></svg>',
     store: '<svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 10.5V7a3 3 0 0 1 6 0v3.5"/></svg>',
     check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
@@ -167,6 +172,15 @@
     // no "quick" from an older bridge: the sleep timer, and the picture switch where the TV has one
     QUICK = (Array.isArray(ST.quick) ? ST.quick : TVCFG.quick || ["sleep", "picture"])
       .filter(function (q, i, a) { return QUICK_ALL.indexOf(q) >= 0 && a.indexOf(q) === i; });
+    // the TV's own quick controls (Wi-Fi, Bluetooth, ad blocking, memory) are added once; after that Home settings decides
+    try {
+      if (nativeQuick() && !kept("tvhome.ctl_added")) {
+        QUICK = QUICK.concat(CTL.filter(function (c) { return QUICK.indexOf(c) < 0; }));
+        ST.quick = QUICK.slice();
+        keep("tvhome.ctl_added", { v: 1 });
+        setTimeout(function () { try { saveSettings(); } catch (e) {} }, 2000);
+      }
+    } catch (e) {}
     THEME = (Q.match(/[?&]theme=([a-z]+)/) || [])[1] || lookSetting();
     if (THEME !== "classic") THEME = "night";
     NIGHT = THEME === "night";
@@ -531,6 +545,7 @@
       if (q === "picture") return !OFFLINE && picShown;
       if (q === "look") return true;
       if (q === "input") return !OFFLINE || nativeInputs();
+      if (CTL.indexOf(q) >= 0) return nativeQuick();
       return false;
     });
   }
@@ -565,6 +580,12 @@
         el.innerHTML = ICONS.look + "<span>" + esc(NIGHT ? t("classic_look") : t("night_look")) + "</span>";
       } else if (q === "input") {
         el.innerHTML = ICONS.input + "<span>" + esc(t("input")) + "</span>";
+      } else if (CTL.indexOf(q) >= 0) {
+        var st = readQs(false) || {};
+        var lit = q === "wifi" ? !!(st.wifi && (st.wifi.connected || st.wifi.ethernet))
+          : q === "bt" ? !!(st.bt && st.bt.on) : q === "ads" ? !!(st.ads && st.ads.on) : false;
+        el.innerHTML = ICONS[q] + "<span>" + esc(t("quick_" + q)) + "</span>";
+        el.classList.toggle("lit", lit);
       }
     });
     if (qi >= vis.length) qi = Math.max(0, vis.length - 1);
@@ -632,6 +653,92 @@
     else if (q === "picture") togglePicture();
     else if (q === "look") toggleLook();
     else if (q === "input") openInputs();
+    else if (CTL.indexOf(q) >= 0) openPanel(q);
+  }
+
+  // ---------------- quick controls that open a panel: Wi-Fi, Bluetooth, ad blocking, memory ----------------
+  var ctlQ = null, ctlI = 0, ctlRows = [], ctlHead = "", ctlSub = "", ctlMsg = "", qs = null, qsAt = 0;
+  function nativeQuick() { try { return !!(TV && TV.quickState); } catch (e) { return false; } }
+  function readQs(force) {
+    if (!force && qs && Date.now() - qsAt < 3000) return qs;
+    try { qs = JSON.parse(TV.quickState()); qsAt = Date.now(); } catch (e) {}
+    return qs;
+  }
+  function ctlTry(fn) { try { return fn(); } catch (e) { return false; } }
+  var DNS_NEEDS = "One-time setup: on a computer or phone run  adb shell pm grant app.couchtv.launcher android.permission.WRITE_SECURE_SETTINGS";
+  function ctlBuild(q) {
+    var s = readQs(true) || {}, rows = [], head = "", sub = "";
+    if (q === "wifi") {
+      var w = s.wifi || {};
+      head = "Wi-Fi";
+      sub = w.connected
+        ? (w.ssid ? "Connected to " + w.ssid : "Connected") + (w.level != null ? " · signal " + ["very weak", "weak", "fair", "good", "excellent"][Math.max(0, Math.min(4, w.level))] : "")
+        : w.ethernet ? "Using the Ethernet cable" : w.on ? "Not connected" : "Off";
+      rows.push({ label: "Open Wi-Fi settings", act: function () { ctlTry(function () { return TV.openWifi(); }); } });
+    } else if (q === "bt") {
+      var b = s.bt || {};
+      head = "Bluetooth";
+      if (!b.has) sub = "This TV has no Bluetooth";
+      else sub = (b.on ? "On" : "Off") + (b.paired && b.paired.length ? " · Paired: " + b.paired.slice(0, 4).join(", ") : "");
+      if (b.has) {
+        rows.push({ label: b.on ? "Turn Bluetooth off" : "Turn Bluetooth on", act: function () {
+          var ok = ctlTry(function () { return TV.setBluetooth(!b.on); });
+          ctlMsg = ok ? "" : "Android did not allow it. Run  adb shell pm grant app.couchtv.launcher android.permission.BLUETOOTH_CONNECT";
+          ctlLater();
+        } });
+        rows.push({ label: "Open Bluetooth settings", act: function () { ctlTry(function () { return TV.openBluetooth(); }); } });
+      }
+    } else if (q === "ads") {
+      var d = s.ads || {};
+      head = "Ad blocking";
+      sub = d.on ? "On · " + d.host : "Off";
+      if (s.vpn) sub += " · A VPN is on, so it uses its own DNS and this does nothing until the VPN is off";
+      var setDns = function (host) {
+        var ok = ctlTry(function () { return TV.setDns(host); });
+        ctlMsg = ok ? "" : DNS_NEEDS;
+        ctlLater();
+      };
+      if (d.on) rows.push({ label: "Turn ad blocking off", act: function () { setDns(""); } });
+      else rows.push({ label: "Turn on AdGuard DNS", act: function () { setDns("dns.adguard-dns.com"); } });
+      rows.push({ label: "AdGuard Family (also blocks adult sites)", act: function () { setDns("family.adguard-dns.com"); } });
+      rows.push({ label: "More options (TV tools)", act: function () { ctlTry(function () { return TV.openTools(); }); } });
+    } else if (q === "clean") {
+      var m = s.mem || {};
+      head = "Free memory";
+      sub = m.free + " MB free of " + m.total + " MB";
+      rows.push({ label: "Close all apps", act: function () {
+        var n = ctlTry(function () { return TV.closeApps(); });
+        ctlMsg = n ? "Closing " + n + " apps..." : "";
+        ctlLater(1600);
+      } });
+    }
+    ctlHead = head; ctlSub = sub; ctlRows = rows;
+  }
+  function renderPanel() {
+    $("ctl-panel").innerHTML = "<h3>" + esc(ctlHead) + "</h3><p>" + esc(ctlSub) + "</p>" +
+      ctlRows.map(function (r, i) { return '<div class="crow' + (i === ctlI ? " focus" : "") + '">' + esc(r.label) + "</div>"; }).join("") +
+      (ctlMsg ? '<p class="cmsg">' + esc(ctlMsg) + "</p>" : "");
+  }
+  function ctlRefresh() {
+    if (zone !== "panel" || !ctlQ) return;
+    ctlBuild(ctlQ);
+    ctlI = Math.min(ctlI, Math.max(0, ctlRows.length - 1));
+    if (ctlMsg.indexOf("Closing") === 0) ctlMsg = "";
+    renderPanel();
+    renderQuick();
+  }
+  function ctlLater(ms) { setTimeout(ctlRefresh, ms || 1200); }
+  function openPanel(q) {
+    ctlQ = q; ctlI = 0; ctlMsg = "";
+    ctlBuild(q);
+    zone = "panel";
+    $("ctl-panel").classList.add("on");
+    renderPanel();
+  }
+  function closePanel() {
+    $("ctl-panel").classList.remove("on");
+    ctlQ = null;
+    zone = "quick";
   }
   function refreshQuick() {
     var jobs = [];
@@ -1036,6 +1143,7 @@
     clearFocus();
     renderHint();
     if (zone === "gear") { if (gridEls[g]) gridEls[g].classList.add("focus"); renderGear(); return; }
+    if (zone === "panel") { renderPanel(); return; }
     if (zone === "menu") { renderMenu(); return; }
     if (zone === "pmenu") { renderPop(); $("people").classList.add("focus"); return; }
     if (zone === "quick" && quickEls[qi]) {
@@ -1088,6 +1196,11 @@
     if (lift) { moveLift(dx, dy); return; }
     // Night with More apps open: the cards step aside, so up and down skip them
     var cards = NIGHT && expanded ? [] : shelfEls;
+    if (zone === "panel") {
+      if (dy) ctlI = Math.max(0, Math.min(ctlRows.length - 1, ctlI + dy));
+      paintFocus();
+      return;
+    }
     if (zone === "menu") {
       if (dx) menuI = Math.max(0, Math.min(SLEEP_CHOICES.length - 1, menuI + dx));
       paintFocus();
@@ -1159,6 +1272,7 @@
     if (zone === "gear") { closeGear(); paintFocus(); return; }
     if (lift) { dropLift(); return; }   // BACK puts a picked-up app down where it is
     if (zone === "pmenu") { if (plift) dropPeople(); else closePop(); paintFocus(); return; }
+    if (zone === "panel") { closePanel(); paintFocus(); return; }
     if (zone === "menu") { closeMenu(); paintFocus(); return; }   // BACK just closes the sleep choices
     if (expanded) { expanded = false; renderGrid(); }
     startFocus();
@@ -1187,6 +1301,7 @@
     if (zone === "settings") { setActivate(); return; }
     if (zone === "gear") { if (gi === 0) openSettings(); else openTvSettings(); return; }
     if (lift) { dropLift(); return; }
+    if (zone === "panel") { var pr = ctlRows[ctlI]; if (pr) pr.act(); renderPanel(); return; }
     if (zone === "menu") { setSleep(SLEEP_CHOICES[menuI]); paintFocus(); return; }
     if (zone === "pmenu") {
       if (plift) { dropPeople(); return; }
@@ -2181,6 +2296,8 @@
     if (TV) data.apps = sortApps(nativeApps() || []);
     if (cached || TV) { render(); mark("home-painted-from-cache"); }
     renderQuick();
+    // keep the Wi-Fi, Bluetooth and ad blocking lights up to date while the home is open
+    if (nativeQuick()) setInterval(function () { if (zone !== "panel") { readQs(true); renderQuick(); } }, 20000);
     if (!OFFLINE) refreshQuick();
     refresh().then(function () { mark("home-painted-live"); });
   }

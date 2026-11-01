@@ -449,6 +449,30 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun launch(pkg: String): Boolean = launchPackage(pkg)
 
+        /** Wi-Fi, Bluetooth, ad blocking and memory, as JSON, for the quick controls. */
+        @JavascriptInterface
+        fun quickState(): String = quickStateJson().toString()
+
+        @JavascriptInterface
+        fun setBluetooth(on: Boolean): Boolean = this@MainActivity.setBluetooth(on)
+
+        @JavascriptInterface
+        fun openWifi(): Boolean = start(Intent(Settings.ACTION_WIFI_SETTINGS))
+
+        @JavascriptInterface
+        fun openBluetooth(): Boolean = start(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+
+        /** AdGuard DNS etc. An empty host turns it off. False means Android needs the one-time permission. */
+        @JavascriptInterface
+        fun setDns(host: String): Boolean = Quick.setDns(this@MainActivity, host.trim().ifEmpty { null })
+
+        /** Closes the background apps. Returns how many it asked. */
+        @JavascriptInterface
+        fun closeApps(): Int = Cleaner.closeAll(this@MainActivity)
+
+        @JavascriptInterface
+        fun openTools(): Boolean = start(Intent(this@MainActivity, ButtonsActivity::class.java))
+
         /** Android's Watch Next list (what each app says you are in the middle of), as JSON. */
         @JavascriptInterface
         fun watchNext(): String = readWatchNext().toString()
@@ -625,10 +649,66 @@ class MainActivity : Activity() {
 
     /** Asks once. Without it Android answers the Watch Next query with nothing. */
     private fun askWatchNextPermission() {
-        if (checkSelfPermission(READ_TV) == PackageManager.PERMISSION_GRANTED) return
-        if (prefs.getBoolean("askedWatchNext", false)) return
-        prefs.edit().putBoolean("askedWatchNext", true).apply()
-        try { requestPermissions(arrayOf(READ_TV), 77) } catch (e: Exception) {}
+        val want = mutableListOf(READ_TV, "android.permission.ACCESS_FINE_LOCATION")
+        if (android.os.Build.VERSION.SDK_INT >= 31) want.add("android.permission.BLUETOOTH_CONNECT")
+        val missing = want.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isEmpty() || prefs.getBoolean("askedPerms2", false)) return
+        prefs.edit().putBoolean("askedPerms2", true).apply()
+        try { requestPermissions(missing.toTypedArray(), 77) } catch (e: Exception) {}
+    }
+
+    // ------------------------------------------------------------ quick controls (Wi-Fi, Bluetooth, ad blocking, memory)
+
+    @Suppress("DEPRECATION")
+    private fun quickStateJson(): JSONObject {
+        val o = JSONObject()
+        val w = JSONObject()
+        try {
+            val wm = applicationContext.getSystemService(android.net.wifi.WifiManager::class.java)
+            val cm = getSystemService(android.net.ConnectivityManager::class.java)
+            val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
+            val onWifi = caps?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true
+            w.put("on", wm?.isWifiEnabled == true)
+            w.put("connected", onWifi)
+            w.put("ethernet", caps?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) == true)
+            if (onWifi && wm != null) {
+                val info = wm.connectionInfo
+                var ssid = info?.ssid?.trim('"') ?: ""
+                if (ssid == "<unknown ssid>") ssid = ""
+                w.put("ssid", ssid)
+                w.put("level", android.net.wifi.WifiManager.calculateSignalLevel(info?.rssi ?: -100, 5))
+            }
+        } catch (e: Exception) {}
+        o.put("wifi", w)
+        val b = JSONObject()
+        try {
+            val ad = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+            b.put("has", ad != null)
+            if (ad != null) {
+                b.put("on", ad.isEnabled)
+                val ok = android.os.Build.VERSION.SDK_INT < 31 ||
+                    checkSelfPermission("android.permission.BLUETOOTH_CONNECT") == PackageManager.PERMISSION_GRANTED
+                b.put("perm", ok)
+                val names = JSONArray()
+                if (ok) for (d in ad.bondedDevices) names.put(d.name ?: d.address)
+                b.put("paired", names)
+            }
+        } catch (e: Exception) {}
+        o.put("bt", b)
+        val host = try { Quick.dnsHost(this) } catch (e: Exception) { null }
+        o.put("ads", JSONObject().put("on", host != null).put("host", host ?: ""))
+        o.put("vpn", try { Quick.vpnOn(this) } catch (e: Exception) { false })
+        val m = Cleaner.mem(this)
+        o.put("mem", JSONObject().put("free", m.freeMb).put("total", m.totalMb))
+        return o
+    }
+
+    @Suppress("DEPRECATION")
+    private fun setBluetooth(on: Boolean): Boolean = try {
+        val ad = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+        if (ad == null) false else if (on) ad.enable() else ad.disable()
+    } catch (e: Exception) {
+        false
     }
 
     private fun readWatchNext(): JSONArray {

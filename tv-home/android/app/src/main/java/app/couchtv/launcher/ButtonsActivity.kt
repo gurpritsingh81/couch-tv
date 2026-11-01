@@ -74,6 +74,9 @@ class ButtonsActivity : Activity() {
         list.addView(note("Memory: ${mem.freeMb} MB free of ${mem.totalMb} MB"))
         cleanRow = row("Close all apps and free memory") { clean() }
         list.addView(cleanRow)
+        list.addView(row("Ad blocking", null).apply { textSize = 22f })
+        list.addView(note(dnsStatus()))
+        list.addView(row("Set up AdGuard DNS") { chooseDns() })
         list.addView(row("Buttons", null).apply { textSize = 22f })
         val on = serviceOn()
         list.addView(note(if (on) "Everywhere: ON. Changes work inside every app."
@@ -89,6 +92,76 @@ class ButtonsActivity : Activity() {
                 "adb shell settings put secure accessibility_enabled 1"))
         }
         cleanRow.requestFocus()
+    }
+
+    // ------------------------------------------------------------ ad blocking (Private DNS)
+
+    private fun dnsStatus(): String {
+        val mode = Settings.Global.getString(contentResolver, "private_dns_mode") ?: "opportunistic"
+        val host = Settings.Global.getString(contentResolver, "private_dns_specifier") ?: ""
+        var s = if (mode == "hostname" && host.isNotEmpty()) "On: $host" else "Off"
+        s += ". It blocks ads and trackers in apps. It does not block YouTube video ads."
+        val cm = getSystemService(android.net.ConnectivityManager::class.java)
+        val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
+        if (caps != null && caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) {
+            s += "\nA VPN is on right now. It uses its own DNS, so this does nothing until the VPN is off (use the VPN app's own ad blocker instead)."
+        }
+        return s
+    }
+
+    private fun chooseDns() {
+        val names = arrayOf("AdGuard: blocks ads and trackers", "AdGuard Family: also blocks adult sites",
+            "AdGuard, no filtering (just DNS)", "My own AdGuard address...", "Turn ad blocking off")
+        AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+            .setTitle("Ad blocking")
+            .setItems(names) { _, which ->
+                when (which) {
+                    0 -> setDns("dns.adguard-dns.com")
+                    1 -> setDns("family.adguard-dns.com")
+                    2 -> setDns("unfiltered.adguard-dns.com")
+                    3 -> askDnsName()
+                    4 -> setDns(null)
+                }
+            }.show()
+    }
+
+    private fun askDnsName() {
+        val box = android.widget.EditText(this).apply {
+            hint = "for example abc123.d.adguard-dns.com"
+            setSingleLine(true)
+            setTextColor(Color.WHITE)
+        }
+        AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+            .setTitle("Your AdGuard address")
+            .setMessage("The server name from your own AdGuard DNS account (Setup, Private DNS).")
+            .setView(box)
+            .setPositiveButton("Save") { _, _ ->
+                val h = box.text.toString().trim().lowercase()
+                if (Regex("[a-z0-9.-]{3,253}").matches(h) && h.contains('.')) setDns(h)
+                else Toast.makeText(this, "That doesn't look like a server name.", Toast.LENGTH_LONG).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun setDns(host: String?) {
+        try {
+            if (host == null) {
+                Settings.Global.putString(contentResolver, "private_dns_mode", "opportunistic")
+            } else {
+                Settings.Global.putString(contentResolver, "private_dns_specifier", host)
+                Settings.Global.putString(contentResolver, "private_dns_mode", "hostname")
+            }
+            Toast.makeText(this, if (host == null) "Ad blocking off." else "Ad blocking on: $host", Toast.LENGTH_LONG).show()
+            render()
+        } catch (e: SecurityException) {
+            AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+                .setTitle("One-time setup needed")
+                .setMessage("Android needs you to allow this once from a computer or phone with ADB:\n\n" +
+                    "adb shell pm grant $packageName android.permission.WRITE_SECURE_SETTINGS\n\nThen try again.")
+                .setPositiveButton("OK", null)
+                .show()
+        }
     }
 
     private fun clean() {

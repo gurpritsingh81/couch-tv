@@ -92,6 +92,20 @@ body {
 .sleep-menu.on { display: flex; }
 .sleep-menu .opt { white-space: nowrap; padding: 0 1.25rem; border-radius: 1.5rem; font-size: 1.4375rem; line-height: 2.75rem; font-weight: 600; color: rgba(255, 255, 255, 0.85); transition: transform 200ms var(--ease); }
 .sleep-menu .opt.focus { background: #fff; color: #111; transform: scale(1.08); }
+.qbtn.lit { box-shadow: inset 0 0 0 0.125rem rgba(255, 255, 255, 0.55); }
+/* the Wi-Fi, Bluetooth, ad blocking and memory panels: a glass card under the quick buttons, like a phone's control centre */
+.ctl-panel {
+  display: none; position: absolute; right: 0; top: calc(100% + 0.75rem); z-index: 6; width: 36rem; max-width: 80vw;
+  padding: 1.5rem; border-radius: 2rem; background: rgba(28, 28, 32, 0.8);
+  -webkit-backdrop-filter: blur(1.5rem); backdrop-filter: blur(1.5rem);
+  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.45); text-shadow: none; color: #fff; text-align: left;
+}
+.ctl-panel.on { display: block; }
+.ctl-panel h3 { margin: 0 0 0.25rem; font-size: 1.875rem; font-weight: 700; }
+.ctl-panel p { margin: 0 0 1rem; font-size: 1.25rem; line-height: 1.6rem; color: rgba(255, 255, 255, 0.72); }
+.ctl-panel p.cmsg { margin: 0.75rem 0 0; color: var(--warn, #ffb340); }
+.ctl-panel .crow { padding: 0 1.25rem; margin-top: 0.5rem; border-radius: 1.5rem; font-size: 1.4375rem; line-height: 3rem; font-weight: 600; color: rgba(255, 255, 255, 0.9); transition: transform 200ms var(--ease); }
+.ctl-panel .crow.focus { background: #fff; color: #111; transform: scale(1.03); }
 .quick-note { margin-top: 0.5rem; font-size: 1.4375rem; color: var(--warn); min-height: 1.875rem; }
 
 .hero { max-width: 62rem; opacity: 0; transform: translateY(0.5rem); transition: opacity 400ms var(--ease), transform 400ms var(--ease); }
