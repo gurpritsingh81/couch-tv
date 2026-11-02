@@ -495,6 +495,34 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun openInputs(): Boolean = inputsIntent()?.let { start(it) } ?: false
 
+        /** The TV's inputs as JSON: [{id, label, type, pass}], for the Inputs dropdown. */
+        @JavascriptInterface
+        fun inputList(): String = try {
+            val tim = getSystemService(android.content.Context.TV_INPUT_SERVICE) as android.media.tv.TvInputManager
+            val out = JSONArray()
+            for (ti in tim.tvInputList) {
+                if (ti.isHidden(this@MainActivity)) continue
+                val label = (ti.loadCustomLabel(this@MainActivity) ?: ti.loadLabel(this@MainActivity))?.toString() ?: ti.id
+                out.put(JSONObject().put("id", ti.id).put("label", label).put("type", ti.type).put("pass", ti.isPassthroughInput))
+            }
+            out.toString()
+        } catch (e: Exception) {
+            "[]"
+        }
+
+        /** Switches to one input: an HDMI or composite port, or the TV tuner (Live TV). */
+        @JavascriptInterface
+        fun switchInput(id: String): Boolean = try {
+            val tim = getSystemService(android.content.Context.TV_INPUT_SERVICE) as android.media.tv.TvInputManager
+            val ti = tim.tvInputList.firstOrNull { it.id == id }
+            val uri = if (ti != null && ti.isPassthroughInput) android.media.tv.TvContract.buildChannelUriForPassthroughInput(id)
+                else android.media.tv.TvContract.Channels.CONTENT_URI
+            val i = Intent(Intent.ACTION_VIEW, uri)
+            if (i.resolveActivity(packageManager) != null) start(i) else false
+        } catch (e: Exception) {
+            false
+        }
+
         // The saved copy has its own web storage, so the page keeps what it needs offline here.
         @JavascriptInterface
         fun keep(key: String, value: String) {

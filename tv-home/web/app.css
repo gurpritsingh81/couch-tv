@@ -522,3 +522,19 @@ body {
   .srow.lifted { animation: none; }
   .set-rows { scroll-behavior: auto; }
 }
+
+/* Inputs and Wi-Fi: glass-gradient pills with labels, and a deep-blue dropdown card (Night look) */
+.theme-night .qbtn { min-width: 0; height: 4.5rem; padding: 0 2rem; gap: 0.75rem; border-radius: 2.25rem;
+  background: linear-gradient(135deg, rgba(88, 52, 160, 0.92), rgba(48, 64, 176, 0.92));
+  box-shadow: inset 0 0 0 0.125rem rgba(190, 200, 255, 0.55), 0 1rem 2.5rem rgba(0, 0, 0, 0.3); color: #fff; }
+.theme-night .qbtn span { display: inline; }
+.theme-night .qbtn svg { width: 1.875rem; height: 1.875rem; }
+.theme-night .qbtn.focus { background: rgba(255, 255, 255, 0.95); color: #1a1a3a; transform: scale(1.06); }
+.theme-night .ctl-panel { width: 26rem; padding: 1rem; border-radius: 2rem; color: #fff;
+  background: linear-gradient(160deg, rgba(36, 44, 130, 0.94), rgba(22, 30, 96, 0.94));
+  box-shadow: inset 0 0 0 0.125rem rgba(190, 200, 255, 0.4), 0 1.5rem 3.75rem rgba(0, 0, 0, 0.45); }
+.ctl-panel .crow { display: flex; align-items: center; gap: 1rem; }
+.ctl-panel .crow svg { width: 1.875rem; height: 1.875rem; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+.ctl-panel .crow.focus { color: #1a1a3a; }
+.ctl-panel .csep { height: 0.0625rem; margin: 0.5rem 0.5rem 0; background: rgba(190, 200, 255, 0.3); }
+.ctl-panel.menu { width: 22rem; }

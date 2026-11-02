@@ -92,6 +92,9 @@
     ads: '<svg viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.5c0 4.5-3 8-7.5 9.5-4.5-1.5-7.5-5-7.5-9.5V6z"/><path d="M8.8 12l2.4 2.4 4-4.4"/></svg>',
     clean: '<svg viewBox="0 0 24 24"><rect x="5" y="7" width="14" height="10" rx="2"/><path d="M8 7V4.5M12 7V4.5M16 7V4.5M8 19.5V17M12 19.5V17M16 19.5V17"/></svg>',
     input: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2.5"/><path d="M8 21h8M12 7.5v6M9.5 11l2.5 2.5 2.5-2.5"/></svg>',
+    hdmi: '<svg viewBox="0 0 24 24"><path d="M4 7.5h16v5.5l-2.5 3.5h-11L4 13z"/><path d="M8.5 10.5h7"/></svg>',
+    composite: '<svg viewBox="0 0 24 24"><circle cx="7" cy="12" r="2.6"/><circle cx="17" cy="12" r="2.6"/><path d="M12 5.5v.1M12 18.5v.1"/></svg>',
+    live: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="12" rx="2"/><path d="M8 3l4 4 4-4"/></svg>',
     store: '<svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 10.5V7a3 3 0 0 1 6 0v3.5"/></svg>',
     check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
     updown: '<svg viewBox="0 0 24 24"><path d="M8 9.5l4-4 4 4M8 14.5l4 4 4-4"/></svg>',
@@ -652,7 +655,7 @@
     if (q === "sleep") openMenu();
     else if (q === "picture") togglePicture();
     else if (q === "look") toggleLook();
-    else if (q === "input") openInputs();
+    else if (q === "input") { if (nativeList()) openPanel("input"); else openInputs(); }
     else if (CTL.indexOf(q) >= 0) openPanel(q);
   }
 
@@ -666,8 +669,27 @@
   }
   function ctlTry(fn) { try { return fn(); } catch (e) { return false; } }
   var DNS_NEEDS = "One-time setup: on a computer or phone run  adb shell pm grant app.couchtv.launcher android.permission.WRITE_SECURE_SETTINGS";
+  function nativeList() { try { return !!(TV && TV.inputList && JSON.parse(TV.inputList()).length); } catch (e) { return false; } }
   function ctlBuild(q) {
-    var s = readQs(true) || {}, rows = [], head = "", sub = "";
+    var s = q === "input" ? {} : readQs(true) || {}, rows = [], head = "", sub = "";
+    if (q === "input") {
+      var list = []; try { list = JSON.parse(TV.inputList()); } catch (e) {}
+      var hd = list.filter(function (x) { return x.pass && x.type === 1007; });
+      var an = list.filter(function (x) { return x.pass && x.type !== 1007; });
+      var tu = list.filter(function (x) { return !x.pass; });
+      var add = function (arr, icon) {
+        arr.forEach(function (x) {
+          rows.push({ label: x.label, icon: icon, act: function () { ctlTry(function () { return TV.switchInput(x.id); }); closePanel(); } });
+        });
+      };
+      add(hd, "hdmi");
+      if (hd.length && an.length) rows.push({ sep: true });
+      add(an, "composite");
+      if ((hd.length || an.length) && tu.length) rows.push({ sep: true });
+      if (tu.length) rows.push({ label: "Live TV", icon: "live", act: function () { ctlTry(function () { return TV.switchInput(tu[0].id); }); closePanel(); } });
+      ctlHead = ""; ctlSub = ""; ctlRows = rows;
+      return;
+    }
     if (q === "wifi") {
       var w = s.wifi || {};
       head = "Wi-Fi";
@@ -715,8 +737,12 @@
     ctlHead = head; ctlSub = sub; ctlRows = rows;
   }
   function renderPanel() {
-    $("ctl-panel").innerHTML = "<h3>" + esc(ctlHead) + "</h3><p>" + esc(ctlSub) + "</p>" +
-      ctlRows.map(function (r, i) { return '<div class="crow' + (i === ctlI ? " focus" : "") + '">' + esc(r.label) + "</div>"; }).join("") +
+    $("ctl-panel").classList.toggle("menu", ctlQ === "input");
+    $("ctl-panel").innerHTML = (ctlHead ? "<h3>" + esc(ctlHead) + "</h3><p>" + esc(ctlSub) + "</p>" : "") +
+      ctlRows.map(function (r, i) {
+        if (r.sep) return '<div class="csep"></div>';
+        return '<div class="crow' + (i === ctlI ? " focus" : "") + '">' + (r.icon ? ICONS[r.icon] : "") + "<span>" + esc(r.label) + "</span></div>";
+      }).join("") +
       (ctlMsg ? '<p class="cmsg">' + esc(ctlMsg) + "</p>" : "");
   }
   function ctlRefresh() {
@@ -1197,7 +1223,11 @@
     // Night with More apps open: the cards step aside, so up and down skip them
     var cards = NIGHT && expanded ? [] : shelfEls;
     if (zone === "panel") {
-      if (dy) ctlI = Math.max(0, Math.min(ctlRows.length - 1, ctlI + dy));
+      if (dy) {
+        var ni = ctlI + dy;
+        while (ctlRows[ni] && ctlRows[ni].sep) ni += dy;
+        if (ctlRows[ni]) ctlI = ni;
+      }
       paintFocus();
       return;
     }
