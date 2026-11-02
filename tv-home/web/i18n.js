@@ -33,6 +33,7 @@
     picture_mode: "Picture mode",
     classic_look: "Classic look",
     night_look: "Night look",
+    castle_look: "Castle look",
     input: "Input",
     n_min: "{n} min",
     timer_off: "Off",

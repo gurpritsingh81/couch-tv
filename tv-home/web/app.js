@@ -30,7 +30,7 @@
   var CTL = ["wifi", "bt", "ads", "clean"];   // quick controls that open a panel (the launcher answers them)
   var QUICK_ALL = ["sleep", "picture", "look", "input"].concat(CTL);
   // The look: ?theme= for a preview, then Home settings (or the Look button) on this TV, then home.look.
-  var THEME = "night", NIGHT = true, CLOCK24 = false;
+  var THEME = "castle", NIGHT = true, CASTLE = false, CLOCK24 = false;
   // Home settings made on this TV with the gear tile (see "home settings" below). They win over
   // config.js. ST is the saved object; the rest are read from it in readConfig().
   var ST = {}, WX_SHOW = true, WX_F = false, WX_EVERY = 30, HIDDEN_TV = [];
@@ -185,9 +185,12 @@
       }
     } catch (e) {}
     THEME = (Q.match(/[?&]theme=([a-z]+)/) || [])[1] || lookSetting();
-    if (THEME !== "classic") THEME = "night";
-    NIGHT = THEME === "night";
+    if (THEME !== "classic" && THEME !== "night") THEME = "castle";
+    NIGHT = THEME !== "classic";
+    CASTLE = THEME === "castle" && !!window.CASTLE;
+    if (!CASTLE && THEME === "castle") THEME = "night";
     document.documentElement.classList.toggle("theme-night", NIGHT);
+    document.documentElement.classList.toggle("theme-castle", CASTLE);
     GRID_COLS = NIGHT ? 12 : 8;
     DOCK_APPS = Math.max(1, Math.min(10, parseInt(HOME.dock_size, 10) || 10));
     CLOCK24 = (ST.clock || HOME.clock) === "24h";
@@ -206,7 +209,7 @@
     setPeople(localPeopleOrder(people, OFFLINE));
     newApps = kept("tvhome.apps.new") || [];
   }
-  function lookSetting() { return ST.look || kept("tvhome.look") || HOME.look || "night"; }
+  function lookSetting() { return ST.look || kept("tvhome.look") || HOME.look || "castle"; }
 
   // ---------------- helpers ----------------
   function esc(v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
@@ -338,7 +341,7 @@
       '<span class="ww"> ' + esc(wxText(w)) + "</span></span>" : "") + "</span>";
     fitDate();
     document.body.classList.toggle("night", h >= 21 || h < 6);
-    if (NIGHT) glassClock(hm);
+    if (NIGHT && !CASTLE) glassClock(hm);
     if (quickReady) renderQuick();
   }
 
@@ -471,7 +474,7 @@
   // room: first it centres in the space left, then drops the weather's words, then the weather.
   function fitDate() {
     var d = $("date"), line = d.firstChild;
-    if (!NIGHT || !line || !line.getBoundingClientRect) return;
+    if (!NIGHT || CASTLE || !line || !line.getBoundingClientRect) return;
     d.style.left = ""; d.style.right = "";
     d.classList.remove("tight", "tighter");
     var b = line.getBoundingClientRect(), rem = innerWidth / 120;
@@ -580,7 +583,7 @@
         el.innerHTML = ICONS.picture + "<span>" + esc(picLabel()) + "</span>";
         el.classList.toggle("off", !picCanSet);
       } else if (q === "look") {
-        el.innerHTML = ICONS.look + "<span>" + esc(NIGHT ? t("classic_look") : t("night_look")) + "</span>";
+        el.innerHTML = ICONS.look + "<span>" + esc(CASTLE ? t("classic_look") : NIGHT ? t("castle_look") : t("night_look")) + "</span>";
       } else if (q === "input") {
         el.innerHTML = ICONS.input + "<span>" + esc(t("input")) + "</span>";
       } else if (CTL.indexOf(q) >= 0) {
@@ -633,7 +636,7 @@
   }
   // The look is kept on this TV; the page starts again in the other look.
   function toggleLook() {
-    ST.look = NIGHT ? "classic" : "night";
+    ST.look = CASTLE ? "classic" : NIGHT ? "castle" : "night";
     keep("tvhome.look", ST.look);
     saveSettings();
     restart();
@@ -1164,7 +1167,28 @@
   function peopleOn() { return peopleCount() >= 2 && shelfOn(); }
   function toPeople() { zone = "people"; pi = whoIndex(); }
 
+  // Castle look: the owl follows the focus, and the Great Hall (Keep watching) is one step down.
+  function castleSync() {
+    var inHall = zone === "shelf" || zone === "hall", el = null;
+    document.documentElement.classList.toggle("in-hall", inHall);
+    window.CASTLE.hall(inHall);
+    var he = $("hall-empty");
+    if (he) he.textContent = inHall && !shelfEls.length ? t("nothing_yet") : "";
+    if (zone === "grid" || zone === "gear") el = gridEls[g];
+    else if (zone === "shelf") el = shelfEls[s];
+    else if (zone === "quick" || zone === "panel" || zone === "menu") el = quickEls[qi];
+    else if (zone === "people" || zone === "pmenu") el = isHead() ? $("people") : $("people").children[pi];
+    window.CASTLE.perch(el || null);
+  }
+  var castleHall = false;
   function paintFocus() {
+    paintFocus0();
+    if (!CASTLE) return;
+    // the hall is a view of its own when there is nothing to pick there
+    castleSync();
+  }
+  function paintFocus0() {
+    if (zone === "hall") { clearFocus(); return; }
     if (zone === "settings") { renderSettings(); return; }
     clearFocus();
     renderHint();
@@ -1215,9 +1239,30 @@
     return best;
   }
 
+  // Castle look: the dock is the castle, Keep watching is the Great Hall below it.
+  function castleMove(dx, dy) {
+    if (!dy) return false;
+    var lastRow = Math.floor((gridEls.length - 1) / GRID_COLS), row = Math.floor(g / GRID_COLS);
+    if (zone === "grid") {
+      if (dy > 0 && row === lastRow && !expanded) { zone = shelfEls.length ? "shelf" : "hall"; if (s >= shelfEls.length) s = 0; paintFocus(); return true; }
+      if (dy < 0 && row === 0) {
+        if (peopleOn()) toPeople(); else if (hasQuick()) { zone = "quick"; qi = 0; }
+        paintFocus(); return true;
+      }
+      return false;
+    }
+    if (zone === "shelf" || zone === "hall") {
+      if (dy < 0) { zone = "grid"; paintFocus(); }
+      return true;
+    }
+    if (zone === "quick" && dy > 0 && !peopleOn()) { zone = "grid"; paintFocus(); return true; }
+    if (zone === "people" && dy > 0) { zone = "grid"; paintFocus(); return true; }
+    return false;
+  }
   function move(dx, dy) {
     touched = true;
     if (zone === "settings") { setMove(dx, dy); return; }
+    if (zone === "hall") { if (dy) castleMove(dx, dy); return; }
     if (zone === "gear") { if (dy) { gi = Math.max(0, Math.min(1, gi + dy)); renderGear(); } return; }
     if (lift) { moveLift(dx, dy); return; }
     // Night with More apps open: the cards step aside, so up and down skip them
@@ -1236,6 +1281,7 @@
       paintFocus();
       return;
     }
+    if (CASTLE && castleMove(dx, dy)) return;
     if (zone === "pmenu") {
       if (dy) {
         var n = Math.max(0, Math.min(PEOPLE.length - 1, pmi + dy));
@@ -1294,7 +1340,7 @@
   function startFocus() {
     s = 0; g = 0;
     if (peopleOn()) toPeople();
-    else zone = shelfEls.length ? "shelf" : "grid";
+    else zone = shelfEls.length && !CASTLE ? "shelf" : "grid";
   }
 
   function goHome() {
@@ -1304,6 +1350,7 @@
     if (zone === "pmenu") { if (plift) dropPeople(); else closePop(); paintFocus(); return; }
     if (zone === "panel") { closePanel(); paintFocus(); return; }
     if (zone === "menu") { closeMenu(); paintFocus(); return; }   // BACK just closes the sleep choices
+    if (CASTLE && (zone === "shelf" || zone === "hall")) { zone = "grid"; paintFocus(); return; }
     if (expanded) { expanded = false; renderGrid(); }
     startFocus();
     paintFocus();
@@ -1341,6 +1388,7 @@
       paintFocus();
       return;
     }
+    if (zone === "hall") return;
     if (zone === "quick") { quickAction(); return; }
     if (zone === "people") {
       if (isHead()) { openPop(); paintFocus(); return; }
@@ -2302,14 +2350,18 @@
     mark("app-start");
     clock();
     setInterval(clock, 15000);
+    if (CASTLE) window.CASTLE.init();
+    if (CASTLE) setInterval(function () { if (zone !== "settings") castleSync(); }, 700);
     if (NIGHT) {
-      buildScenes();
-      // ?scene=fog starts on that scene, for previews (?scene=own: the first of the household's photos)
-      var first = (Q.match(/[?&]scene=([a-z]+)/) || [])[1];
-      showScene(Math.max(0, SCENES.map(function (s) { return s.own ? "own" : s.id; }).indexOf(first)));
-      if (SCENES.length > 1) setInterval(nextScene, SCENE_MS);
-      // the clock font must be in before the glass is measured
-      if (document.fonts) document.fonts.load("300 10px Antonio").then(function () { glassShown = ""; clock(); });
+      if (!CASTLE) {
+        buildScenes();
+        // ?scene=fog starts on that scene, for previews (?scene=own: the first of the household's photos)
+        var first = (Q.match(/[?&]scene=([a-z]+)/) || [])[1];
+        showScene(Math.max(0, SCENES.map(function (s) { return s.own ? "own" : s.id; }).indexOf(first)));
+        if (SCENES.length > 1) setInterval(nextScene, SCENE_MS);
+        // the clock font must be in before the glass is measured
+        if (document.fonts) document.fonts.load("300 10px Antonio").then(function () { glassShown = ""; clock(); });
+      }
       refreshWeather();
       setInterval(refreshWeather, WX_EVERY * 60000);
     }
