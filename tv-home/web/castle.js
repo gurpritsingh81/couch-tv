@@ -411,34 +411,42 @@
     c.globalAlpha = 1;
   }
 
-  // ------------------------------------------------------------------ the owl
-  var OWL_SVG =
-    '<svg viewBox="0 0 120 120" width="100%" height="100%" overflow="visible">' +
-    '<defs><radialGradient id="ob" cx="50%" cy="35%" r="70%"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dfe6f2"/></radialGradient></defs>' +
-    '<g id="ow-wl" opacity="0"><path d="M46 56 C22 34 -10 32 -38 50 C-22 54 -12 62 -8 74 C4 66 14 72 22 84 C32 74 40 74 46 68 Z" fill="#f4f7fc" stroke="#c9d2e2" stroke-width="1.2"/><path d="M-30 50 C-12 52 0 60 6 72 M-14 40 C0 44 14 54 22 66" stroke="#c3cde0" stroke-width="1" fill="none"/></g>' +
-    '<g id="ow-wr" opacity="0"><g transform="translate(120 0) scale(-1 1)"><path d="M46 56 C22 34 -10 32 -38 50 C-22 54 -12 62 -8 74 C4 66 14 72 22 84 C32 74 40 74 46 68 Z" fill="#f4f7fc" stroke="#c9d2e2" stroke-width="1.2"/><path d="M-30 50 C-12 52 0 60 6 72 M-14 40 C0 44 14 54 22 66" stroke="#c3cde0" stroke-width="1" fill="none"/></g></g>' +
-    '<path d="M44 96 L40 114 L52 108 L60 116 L68 108 L80 114 L76 96 Z" fill="#e3e9f4"/>' +
-    '<ellipse cx="60" cy="68" rx="27" ry="35" fill="url(#ob)"/>' +
-    '<path d="M44 52 C38 70 40 92 48 102 C54 98 56 80 54 60 Z" fill="#eef2f9" stroke="#cfd7e6" stroke-width="1" id="ow-fl"/>' +
-    '<path d="M76 52 C82 70 80 92 72 102 C66 98 64 80 66 60 Z" fill="#eef2f9" stroke="#cfd7e6" stroke-width="1" id="ow-fr"/>' +
-    '<g stroke="#c1cadb" stroke-width="1.3" stroke-linecap="round" fill="none"><path d="M54 78l3 4M62 82l3 4M58 90l3 4M66 76l3 4M50 88l3 4M68 90l3 4M56 70l3 3"/></g>' +
-    '<circle cx="60" cy="40" r="24" fill="url(#ob)"/>' +
-    '<g stroke="#c1cadb" stroke-width="1.2" stroke-linecap="round" fill="none"><path d="M46 28l3 3M70 27l-3 3M60 20v4M52 22l2 3M68 22l-2 3"/></g>' +
-    '<circle cx="50.5" cy="40" r="6.4" fill="#f2b81c"/><circle cx="69.5" cy="40" r="6.4" fill="#f2b81c"/>' +
-    '<circle cx="50.5" cy="40" r="3" fill="#111"/><circle cx="69.5" cy="40" r="3" fill="#111"/>' +
-    '<circle cx="51.6" cy="38.8" r="1" fill="#fff"/><circle cx="70.6" cy="38.8" r="1" fill="#fff"/>' +
-    '<g id="ow-lid" style="transform-origin:60px 40px;transform:scaleY(0)"><rect x="42" y="32" width="36" height="16" rx="7" fill="#f4f7fc"/></g>' +
-    '<path d="M57 46 L63 46 L60 54 Z" fill="#3b3f46"/>' +
-    '<path d="M47 108 l-2 6 M52 108 l0 7 M57 108 l2 6 M63 108 l-2 6 M68 108 l0 7 M73 108 l2 6" stroke="#3b3f46" stroke-width="1.6" stroke-linecap="round"/>' +
-    '</svg>';
-
-  var owl = { moved: 0, x: 0, y: 0, fx: 0, fy: 0, tx: 0, ty: 0, t0: 0, dur: 0, air: false, ready: false, vis: false, dir: 0, el: null, blinkAt: 0 };
-  var rem = 16, owlW = 0, owlH = 0, wl, wr, lid, remeasure = 0;
+  // ------------------------------------------------------------------ the owl (your sprite sheets)
+  var HOP = { up: 0.65, down: 2.22, end: 3.0, rate: 1.7 };
+  var owl = { x: 0, y: 0, sx: 0, sy: 0, tx: 0, ty: 0, face: 1, hopping: false, hopT: 0, landed: true, idleT: 0, idleWait: 1, ready: false, vis: false, el: null, last: 0 };
+  var rem = 16, remeasure = 0, sheets = {}, curSheet = null, kscale = 1;
+  function ease(u) { return u * u * u * (u * (u * 6 - 15) + 10); }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function loadSheets() {
+    var P = window.OWL_PACK;
+    if (!P) return;
+    ["idle", "hop"].forEach(function (k) {
+      var sh = sheets[k] = { img: new Image(), last: -1 }, d = P[k], p;
+      for (p in d) sh[p] = d[p];
+      sh.img.src = d.src;
+      sh.cv = mk(d.cw, d.ch);
+      sh.cv.style.cssText = "position:absolute;left:" + (-d.footX) + "px;top:" + (-d.footY) + "px;visibility:hidden";
+      sh.ctx = sh.cv.getContext("2d");
+      owlEl.appendChild(sh.cv);
+    });
+  }
+  function drawSheet(sh, t) {
+    if (curSheet !== sh) {
+      if (curSheet) curSheet.cv.style.visibility = "hidden";
+      curSheet = sh; sh.cv.style.visibility = "visible"; sh.last = -1;
+    }
+    var f = Math.min(sh.n - 1, Math.max(0, Math.floor(t * sh.fps)));
+    if (!sh.img.complete || !sh.img.naturalWidth || sh.last === f) return;
+    sh.last = f;
+    sh.ctx.clearRect(0, 0, sh.cw, sh.ch);
+    var fr = sh.frames[f];
+    sh.ctx.drawImage(sh.img, fr[0], fr[1], fr[2], fr[3], fr[4], fr[5], fr[2], fr[3]);
+  }
   function sizes() {
     rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    owlH = rem * 6.2; owlW = owlH;
-    owlEl.style.width = owlW + "px"; owlEl.style.height = owlH + "px";
+    kscale = window.innerWidth / 1920;
   }
+  // where the owl's feet go for an element: on top of it, centred
   function point(el, final) {
     var r = el.getBoundingClientRect(), cx = r.left + r.width / 2, top = r.top;
     if (!final) {
@@ -449,9 +457,6 @@
       else top -= r.height * 0.04;
     }
     return { x: cx, y: top + 3 };
-  }
-  function place(x, y) {
-    owl.x = x; owl.y = y;
   }
   function sparkle(x, y) {
     for (var i = 0; i < 7; i++) {
@@ -470,14 +475,19 @@
       })(s, i);
     }
   }
+  function startHop(tx, ty, from, fromHopT) {
+    owl.sx = owl.x; owl.sy = owl.y; owl.tx = tx; owl.ty = ty;
+    owl.face = Math.sign(tx - owl.x) || owl.face;
+    owl.landed = false; owl.hopping = true; owl.hopT = fromHopT;
+  }
   var scene = { moving: false, pending: null, t: 0 };
-  // After the view has scrolled between the castle and the hall, the owl swoops in from above.
+  // after the view scrolls between the castle and the hall the owl swoops in from above
   function arrive(el) {
     var p = point(el, true);
     owl.el = el; owl.vis = true; owl.ready = true;
-    owl.x = p.x; owl.y = -owlH;
-    owl.fx = p.x; owl.fy = -owlH; owl.tx = p.x; owl.ty = p.y;
-    owl.dir = 0; owl.dur = 800; owl.arc = 24; owl.crouch = 0; owl.air = true; owl.t0 = performance.now(); owl.moved = owl.t0;
+    owl.x = p.x; owl.y = -140 * kscale;
+    startHop(p.x, p.y, 0, HOP.up);
+    owl.face = 1;
     owlEl.style.opacity = "1";
   }
   function perch(el) {
@@ -485,82 +495,151 @@
     if (!el) { scene.pending = null; owl.vis = false; owl.el = null; owlEl.style.opacity = "0"; return; }
     if (scene.moving) { scene.pending = el; return; }
     if (el === owl.el && owl.vis) {
-      // the layout can shift under a settled owl (apps arriving, a list growing): follow it
-      if (!owl.air && performance.now() - owl.moved > 600) {
+      if (!owl.hopping) {
         var q = point(el, true);
-        if (Math.abs(q.x - owl.x) > 1.5 || Math.abs(q.y - owl.y) > 1.5) place(q.x, q.y);
-      }
+        if (Math.abs(q.x - owl.x) > 1.5 || Math.abs(q.y - owl.y) > 1.5) { owl.x = q.x; owl.y = q.y; }
+      } else { var q2 = point(el, true); owl.tx = q2.x; owl.ty = q2.y; }
       return;
     }
     var p = point(el, false);
-    owl.el = el; owl.moved = performance.now();
+    owl.el = el;
+    if (camPush) camPush();
     if (!owl.ready || !owl.vis) {
-      owl.vis = true; owl.ready = true; owl.air = false;
-      place(p.x, p.y); owlEl.style.opacity = "1";
+      owl.vis = true; owl.ready = true; owl.hopping = false; owl.landed = true;
+      owl.x = p.x; owl.y = p.y; owlEl.style.opacity = "1";
+    } else if (owl.hopping && owl.hopT < HOP.down) {
+      // changed its mind mid-air: steer to the new perch without a jump
+      var u = ease(clamp((owl.hopT - HOP.up) / (HOP.down - HOP.up), 0, 1));
+      owl.tx = p.x; owl.ty = p.y; owl.face = Math.sign(p.x - owl.x) || owl.face;
+      if (u < 0.95) { owl.sx = (owl.x - p.x * u) / (1 - u); owl.sy = (owl.y - p.y * u) / (1 - u); }
     } else {
-      var dx = p.x - owl.x, dy = p.y - owl.y, dist = Math.sqrt(dx * dx + dy * dy);
-      owl.fx = owl.x; owl.fy = owl.y; owl.tx = p.x; owl.ty = p.y;
-      owl.dir = dx < 0 ? -1 : 1;
-      owl.dur = Math.max(520, Math.min(1000, 460 + dist * 0.45));
-      owl.arc = Math.max(34, Math.min(170, dist * 0.2));
-      owl.t0 = performance.now();
-      owl.crouch = owl.air ? 0 : 1;
-      owl.air = true;
+      startHop(p.x, p.y, 0, owl.hopping && owl.landed ? HOP.up - 0.22 : 0);
     }
     clearTimeout(remeasure);
     remeasure = setTimeout(function () {
       if (owl.el === el && el.getBoundingClientRect) {
         var q = point(el, true);
-        if (owl.air) { owl.tx = q.x; owl.ty = q.y; } else { place(q.x, q.y); }
+        if (owl.hopping) { owl.tx = q.x; owl.ty = q.y; } else { owl.x = q.x; owl.y = q.y; }
       }
     }, 340);
   }
-  function ease(u) { return u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2; }
   function owlFrame(now) {
-    if (!owl.vis) return;
-    var sx = 1, sy = 1, rot = 0, flap = 0, ox = owl.x, oy = owl.y;
-    if (owl.air) {
-      var u = (now - owl.t0) / owl.dur;
-      if (u >= 1) {
-        owl.air = false; owl.x = owl.tx; owl.y = owl.ty; ox = owl.x; oy = owl.y;
-        sparkle(ox, oy - rem);
-        owl.land = now;
-      } else {
-        var cr = owl.crouch ? 0.14 : 0, e;
-        if (u < cr) { var cu = u / cr; sy = 1 - 0.14 * cu; sx = 1 + 0.07 * cu; ox = owl.fx; oy = owl.fy; }
-        else {
-          e = ease((u - cr) / (1 - cr));
-          ox = owl.fx + (owl.tx - owl.fx) * e;
-          oy = owl.fy + (owl.ty - owl.fy) * e - owl.arc * Math.sin(Math.PI * e);
-          rot = owl.dir * 14 * Math.sin(Math.PI * e);
-          flap = Math.sin((now - owl.t0) * 0.034);
-          owl.x = ox; owl.y = oy;
-          // keep the old position in fx/fy fixed; only the display position moves
-          owl.px = ox; owl.py = oy;
-        }
-      }
+    var dt = Math.min(0.1, (now - owl.last) / 1000);
+    owl.last = now;
+    if (!owl.vis || !sheets.idle) return;
+    if (owl.hopping) {
+      owl.hopT += dt * HOP.rate;
+      var ht = owl.hopT, u = ease(clamp((ht - HOP.up) / (HOP.down - HOP.up), 0, 1));
+      var far = Math.abs(owl.tx - owl.sx) / (180 * kscale + 1);
+      owl.x = owl.sx + (owl.tx - owl.sx) * u;
+      owl.y = owl.sy + (owl.ty - owl.sy) * u - Math.max(0, far - 1) * 46 * kscale * Math.sin(Math.PI * u);
+      if (!owl.landed && ht >= HOP.down) { owl.landed = true; sparkle(owl.x, owl.y - rem); }
+      if (ht >= HOP.end) { owl.hopping = false; owl.idleT = 0; owl.idleWait = 0.8 + Math.random() * 1.5; owl.x = owl.tx; owl.y = owl.ty; }
+      drawSheet(sheets.hop, ht);
+    } else {
+      if (owl.idleWait > 0) owl.idleWait -= dt;
+      else if ((owl.idleT += dt) >= sheets.idle.n / sheets.idle.fps) { owl.idleT = 0; owl.idleWait = 1.5 + Math.random() * 3; }
+      drawSheet(sheets.idle, owl.idleWait > 0 ? 0 : owl.idleT);
     }
-    if (!owl.air) {
-      var lu = owl.land ? (now - owl.land) / 320 : 1;
-      if (lu < 1) { sy = 1 - 0.1 * Math.sin(Math.PI * lu) * (1 - lu); sx = 1 + 0.05 * Math.sin(Math.PI * lu); }
-      else { var br = 0.012 * Math.sin(now * 0.0016); sy = 1 + br; sx = 1 - br * 0.5; }
-      if (now > owl.blinkAt) {
-        lid.style.transform = "scaleY(1)";
-        setTimeout(function () { lid.style.transform = "scaleY(0)"; }, 130);
-        owl.blinkAt = now + 2600 + Math.random() * 3800;
-      }
-    }
-    var wing = owl.air && flap !== 0 ? 1 : 0;
-    wl.setAttribute("opacity", wing); wr.setAttribute("opacity", wing);
-    if (wing) {
-      var a = flap * 32 - 8;
-      wl.setAttribute("transform", "rotate(" + a + " 46 56)");
-      wr.setAttribute("transform", "rotate(" + (-a) + " 74 56)");
-    }
-    owlEl.style.transform = "translate3d(" + (ox - owlW / 2) + "px," + (oy - owlH * 0.93) + "px,0) rotate(" + rot + "deg) scale(" + sx + "," + sy + ")";
+    var br = owl.hopping ? 1 : 1 + 0.006 * Math.sin(now * 0.0024);
+    owlEl.style.transform = "translate3d(" + owl.x.toFixed(1) + "px," + owl.y.toFixed(1) + "px,0) scale(" + (owl.face * kscale * br).toFixed(4) + "," + (kscale * br).toFixed(4) + ")";
   }
 
-  // ------------------------------------------------------------------ set up
+  // ------------------------------------------------------------------ the castle photo and its lights
+  var camPush, camP = 0, SW = 1935, SH = 1080, TVM = !!window.TVOS;
+  var pwrap, pbox, winA, winB, moonEl, skyX, wtrX, starSpr, warmSpr, coolSpr, starList = [], glintPts = [], glints = [], meteor = null, nextMeteor = 7, skyTick = 0, fxT = 0;
+  function sprite2(w, h, stops) {
+    var c = mk(w, h), g = c.getContext("2d"), rg = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2), i;
+    for (i = 0; i < stops.length; i++) rg.addColorStop(stops[i][0], stops[i][1]);
+    g.scale(1, h / w); g.fillStyle = rg; g.fillRect(0, 0, w, w);
+    return c;
+  }
+  function flick(t, s) { return 0.5 + 0.30 * Math.sin(t * 1.9 + s) * Math.sin(t * 0.71 + s * 2.3) + 0.12 * Math.sin(t * 6.1 + s * 3.1) + 0.06 * Math.sin(t * 13.7 + s); }
+  function layer(parent, tag, cls) { var e = document.createElement(tag); if (cls) e.className = cls; parent.appendChild(e); return e; }
+  function buildPhoto() {
+    var P = window.POINTS || { stars: [], glints: [] }, C = window.WIN_CROP || [0.33, 0.2, 0.57, 0.8], i;
+    pwrap = layer(world, "div", "pwrap"); pbox = layer(pwrap, "div", "pbox");
+    world.insertBefore(pwrap, mist1);
+    var im = layer(pbox, "img", "pl"); im.alt = "";
+    im.onload = function () {
+      photo.castle = true;
+      sCastle.style.display = "none"; fCastle.style.display = "none";
+      sCastle.width = 1; sCastle.height = 1;                   // the painted castle is no longer needed: give its memory back
+      mist1.className = "mistwrap m1 pic"; mist2.className = "mistwrap m2 pic";
+      mist1.innerHTML = ""; mist2.innerHTML = "";
+      if (TVM) mist2.style.display = "none";
+    };
+    im.src = "castle/castle.jpg";
+    moonEl = layer(pbox, "div", "moonglow");
+    winA = layer(pbox, "img", "pl win"); winA.src = "castle/windows_a.webp"; winA.alt = "";
+    if (!TVM) { winB = layer(pbox, "img", "pl win"); winB.src = "castle/windows_b.webp"; winB.alt = ""; }
+    [winA, winB].forEach(function (w) {
+      if (!w) return;
+      w.style.left = (C[0] * 100) + "%"; w.style.top = (C[1] * 100) + "%"; w.style.width = (C[2] * 100) + "%"; w.style.height = (C[3] * 100) + "%";
+      if (TVM) w.style.mixBlendMode = "normal";
+    });
+    var sky = layer(pbox, "canvas", "pl sky"); sky.width = 968; sky.height = 125; skyX = sky.getContext("2d");
+    var wtr = layer(pbox, "canvas", "pl wtr"); wtr.width = 560; wtr.height = 140; wtrX = wtr.getContext("2d");
+    starSpr = sprite2(32, 32, [[0, "rgba(255,255,255,1)"], [0.12, "rgba(225,238,255,.9)"], [0.35, "rgba(170,200,255,.25)"], [1, "rgba(150,180,255,0)"]]);
+    warmSpr = sprite2(48, 8, [[0, "rgba(255,226,170,1)"], [0.4, "rgba(255,180,100,.5)"], [1, "rgba(255,150,60,0)"]]);
+    coolSpr = sprite2(48, 8, [[0, "rgba(230,240,255,.9)"], [0.4, "rgba(180,205,240,.35)"], [1, "rgba(150,180,230,0)"]]);
+    for (i = 0; i < P.stars.length && i < (TVM ? 64 : 999); i++) {
+      var q = P.stars[i];
+      starList.push({ x: q[0] * SW / 2, y: q[1] * SH / 2, b: clamp(q[2] * 1.3, 0.3, 1), w: 0.6 + Math.random() * 2.2, p: Math.random() * 6.28, r: (2.5 + q[2] * 4) / 2 });
+    }
+    glintPts = P.glints.map(function (g) { return { x: g[0] * SW, y: g[1] * SH }; });
+    camPush = function () { camP = Math.min(0.03, camP + 0.012); };
+  }
+  function fxPhoto(now, dt) {
+    var t = now / 1000, d = dt / 1000, i, g;
+    camP *= Math.pow(0.04, d);
+    pbox.style.transform = "scale(" + (1.0 + 0.009 * Math.sin(t * 2 * Math.PI / 22) + camP).toFixed(4) + ")";
+    winA.style.opacity = (0.22 + 0.42 * flick(t, 0)).toFixed(3);
+    if (winB) winB.style.opacity = (0.22 + 0.42 * flick(t, 2.4)).toFixed(3);
+    moonEl.style.opacity = (0.75 + 0.2 * Math.sin(t / 6.5)).toFixed(3);
+    if (TVM && (skyTick++ & 1)) return;
+    if (!skyX) return;
+    var step = TVM ? d * 2 : d;
+    skyX.clearRect(0, 0, 968, 125); skyX.globalCompositeOperation = "lighter";
+    for (i = 0; i < starList.length; i++) {
+      var s = starList[i], tw = 0.5 + 0.5 * Math.sin(t * s.w + s.p);
+      skyX.globalAlpha = s.b * (0.15 + 0.85 * tw * tw * tw);
+      skyX.drawImage(starSpr, s.x - s.r, s.y - s.r, s.r * 2, s.r * 2);
+    }
+    wtrX.clearRect(0, 0, 560, 140); wtrX.globalCompositeOperation = "lighter";
+    while (glintPts.length && glints.length < 34) {
+      var moon = Math.random() < 0.22, p = moon ? { x: 600 + Math.random() * 170, y: 830 + Math.random() * 220 } : glintPts[(Math.random() * glintPts.length) | 0];
+      glints.push({ x: p.x + (Math.random() - 0.5) * 6, y: p.y, w: 10 + Math.random() * (moon ? 26 : 18), age: -Math.random() * 1.5, life: 0.7 + Math.random() * 1.2, moon: moon });
+    }
+    glints = glints.filter(function (k) { return (k.age += step) < k.life; });
+    for (i = 0; i < glints.length; i++) {
+      g = glints[i];
+      if (g.age < 0) continue;
+      wtrX.globalAlpha = Math.sin(Math.PI * g.age / g.life) * (g.moon ? 0.35 : 0.6);
+      wtrX.drawImage(g.moon ? coolSpr : warmSpr, (g.x - 560 - g.w / 2) / 2, (g.y - 800 - 2) / 2, g.w / 2, 2);
+    }
+    // now and then a shooting star over the hills on the left
+    if (!meteor && t > nextMeteor) meteor = { x: 150 + Math.random() * 210, y: 10 + Math.random() * 60, a: 0 };
+    if (meteor) {
+      meteor.a += step / 0.9;
+      var k = ease(Math.min(1, meteor.a)), hx = meteor.x - 130 * k, hy = meteor.y + 47 * k;
+      var gr = skyX.createLinearGradient(hx, hy, hx + 75, hy - 27), al = Math.sin(Math.PI * Math.min(1, meteor.a)) * 0.8;
+      gr.addColorStop(0, "rgba(235,242,255," + al + ")"); gr.addColorStop(1, "rgba(235,242,255,0)");
+      skyX.globalAlpha = 1; skyX.strokeStyle = gr; skyX.lineWidth = 1; skyX.lineCap = "round";
+      skyX.beginPath(); skyX.moveTo(hx, hy); skyX.lineTo(hx + 75, hy - 27); skyX.stroke();
+      if (meteor.a >= 1) { meteor = null; nextMeteor = t + 14 + Math.random() * 16; }
+    }
+    skyX.globalAlpha = 1; wtrX.globalAlpha = 1;
+  }
+  function loadScripts(list, cb) {
+    var n = list.length;
+    list.forEach(function (u) {
+      var s = document.createElement("script");
+      s.onload = s.onerror = function () { if (--n === 0) cb(); };
+      s.src = u; document.head.appendChild(s);
+    });
+  }
+
   function tryPhoto(src, canvas, key) {
     var im = new Image();
     im.onload = function () {
@@ -579,10 +658,16 @@
     lastFx = now;
     if (both > 0) both -= dt;
     if (!hallOn || both > 0) {
-      fxCastle(now);
       var v = window.innerWidth;
-      mist1.style.transform = "translate3d(" + (-((now * 0.007) % v)) + "px,0,0)";
-      mist2.style.transform = "translate3d(" + (-((now * 0.0125) % v)) + "px,0,0)";
+      if (photo.castle && pbox) {
+        fxPhoto(now, Math.min(dt, 120));
+        mist1.style.transform = "translate3d(" + (-((now * 6.67e-6) % 1) * v).toFixed(1) + "px,0,0)";
+        mist2.style.transform = "translate3d(" + (-((now * 4.3e-6) % 1) * v).toFixed(1) + "px,0,0)";
+      } else {
+        fxCastle(now);
+        mist1.style.transform = "translate3d(" + (-((now * 0.007) % v)) + "px,0,0)";
+        mist2.style.transform = "translate3d(" + (-((now * 0.0125) % v)) + "px,0,0)";
+      }
     }
     if (hallOn || both > 0) fxHall(now);
   }
@@ -601,7 +686,6 @@
     world.appendChild(sCastle); world.appendChild(m1); world.appendChild(m2); world.appendChild(fCastle);
     world.appendChild(sHall); world.appendChild(fHall);
     body.insertBefore(world, body.firstChild);
-    // the cloned canvases are empty: copy the mist into them
     [m1, m2].forEach(function (w, i) {
       var src = i ? cb : ca, kids = w.children;
       kids[1].getContext("2d").drawImage(src, 0, 0);
@@ -612,20 +696,18 @@
     for (i = 0; i < 38; i++) motes.push({ x: r() * W, y: r() * (H + 40), v: 0.5 + r() * 1.3, ph: r() * 6.28, s: 2.5 + r() * 4, a: 0.35 + r() * 0.65 });
     drawCastle(sCastle.getContext("2d"));
     drawHall(sHall.getContext("2d"));
-    tryPhoto("castle/castle.jpg", sCastle, "castle");
     tryPhoto("castle/hall.jpg", sHall, "hall");
-    // the owl and the hint under the dock
     owlEl = document.createElement("div"); owlEl.id = "owl"; owlEl.setAttribute("aria-hidden", "true");
-    owlEl.innerHTML = OWL_SVG;
     body.appendChild(owlEl);
-    wl = owlEl.querySelector("#ow-wl"); wr = owlEl.querySelector("#ow-wr"); lid = owlEl.querySelector("#ow-lid");
     hintEl = document.createElement("div"); hintEl.id = "chint"; hintEl.setAttribute("aria-hidden", "true");
     body.appendChild(hintEl);
     hall(false);
     sizes();
     window.addEventListener("resize", sizes);
+    loadScripts(["castle/layers.js", "castle/points.js", "castle/owl_pack.js"], function () { buildPhoto(); loadSheets(); });
     requestAnimationFrame(loop);
   }
+
   function hall(on) {
     var changed = !!on !== hallOn;
     hallOn = !!on;

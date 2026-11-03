@@ -15,6 +15,19 @@
 .mistwrap.m1 { top: 62vh; opacity: 0.9; }
 .mistwrap.m2 { top: 72vh; opacity: 0.65; }
 
+/* the photo: 1935x1080 of art, its lights are layers on top */
+.pwrap { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; overflow: hidden; background: #04060d; }
+.pbox { position: absolute; left: -1vw; width: 102vw; height: 56.93vw; top: calc((100vh - 56.93vw) / 2); will-change: transform; }
+.pbox .pl { position: absolute; display: block; }
+.pbox img.pl:first-child { left: 0; top: 0; width: 100%; height: 100%; }
+.pbox .win { mix-blend-mode: screen; opacity: 0.4; will-change: opacity; }
+.pbox .sky { left: 0; top: 0; width: 100%; height: 23.15%; }
+.pbox .wtr { left: 28.94%; top: 74.07%; width: 57.88%; height: 25.93%; }
+.pbox .moonglow { position: absolute; left: 22%; top: 4.8%; width: 25.8%; height: 46%; border-radius: 50%; background: radial-gradient(circle, rgba(190,210,255,.28), rgba(190,210,255,0) 66%); will-change: opacity; }
+.mistwrap.pic { background: url(castle/mist.png) repeat-x 0 0 / 100vw 100%; }
+.mistwrap.pic.m1 { top: 56.7vh; height: 27.8vh; opacity: 0.55; }
+.mistwrap.pic.m2 { top: 52vh; height: 38.9vh; opacity: 0.3; }
+
 /* the Night scenes and their shading give way to the castle */
 .theme-castle .scenes, .theme-castle .scrim, .theme-castle .bg { display: none; }
 .theme-castle body, html.theme-castle { background: #04060d; }
@@ -87,7 +100,7 @@
 .theme-castle.hinting #chint, .theme-castle.lifting #chint { opacity: 0; }
 
 /* the owl */
-#owl { position: fixed; top: 0; left: 0; z-index: 4; pointer-events: none; opacity: 0; will-change: transform; transition: opacity 400ms; transform-origin: 50% 93%; }
+#owl { position: fixed; top: 0; left: 0; width: 0; height: 0; z-index: 4; pointer-events: none; opacity: 0; will-change: transform; transition: opacity 400ms; transform-origin: 0 0; }
 .owl-spark {
   position: fixed; z-index: 4; width: 0.5rem; height: 0.5rem; margin: -0.25rem 0 0 -0.25rem; border-radius: 50%; pointer-events: none;
   background: #ffe9a8; box-shadow: 0 0 0.75rem 0.1875rem rgba(255, 210, 120, 0.9); opacity: 1;
